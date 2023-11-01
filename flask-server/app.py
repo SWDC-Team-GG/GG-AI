@@ -5,13 +5,11 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
 import openai
- 
-openai.api_key = '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'
+openai.api_key = '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'
 
 app = Flask(__name__)
 CORS(app, resources={r"*": {"origins": "*"}})
 ocr = ClovaOCR()
-
 
 def process_ocr(base64_image):
     image_bytes = base64.b64decode(base64_image)
@@ -25,6 +23,29 @@ def process_ocr(base64_image):
     ocr_mode='general'
     )
     return result
+
+@app.routes('/')
+def home():
+    value = gpt_response_sim_word('사랑')
+    return str(value)
+
+def gpt_response_sim_word(text):
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role":"user",
+                "content": text+"의 유의어 3개를 3줄로 간단히 알려줘"
+            }
+        ],
+        temperature=0,
+        max_tokens=1024,
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
+    )
+    return response['choices'][0]['message']['content']
+
 
 def gpt_response(text):
     response = openai.ChatCompletion.create(
@@ -174,7 +195,6 @@ def gpt_response(text):
         presence_penalty=0
         )
     return response['choices'][0]['message']['content']
-    
 
 @app.route('/api/ocr', methods=['POST'])
 def api_ocr():
