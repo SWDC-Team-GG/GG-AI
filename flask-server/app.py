@@ -3,24 +3,27 @@ from PIL import Image
 from pyclovaocr import ClovaOCR
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import requests
 import base64
 import openai
 import os
 import json
+from konlpy.tag import Okt
+import json
+import os
+okt = Okt()
 # import pymysql
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-secret_file = os.path.join(BASE_DIR, 'secret.json')
-with open(secret_file) as f:
-    secrets = json.loads(f.read())
+# with open('./secret.json') as f:
+#     secrets = json.loads(f.read())
 
-def get_secret(setting, secrets=secrets):
-    try:
-        return secrets[setting]
-    except KeyError:
-        error_msg = "Set the {} environment variable".format(setting)
-        return (error_msg)
+# def get_secret(setting, secrets=secrets):
+#     try:
+#         return secrets[setting]
+#     except KeyError:
+#         error_msg = "Set the {} environment variable".format(setting)
+#         return (error_msg)
 
-openai.api_key = get_secret('Naver_id')
+openai.api_key = "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"
 
 # db = pymysql.connect(host='svc.sel3.cloudtype.app',
 #                      port=30616,
@@ -64,10 +67,32 @@ def process_ocr(base64_image):
 def gpt_response_sim_word(text):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[
+        messages= 
+        [
+            
+            {
+                "role": "system",
+                "content": "너는 출력할 때 이 출력형식을 따라야해 다른 문자는 절대 보낼 수 없어 '유의어1 유의어2 유의어3' 내가 말한 단어의 유의어 3가지를 띄어쓰기로 구분해서 알려줘"
+            },
+            {
+            "role": "user",
+            "content": "사랑"
+            },
+            {
+            "role": "assistant",
+            "content": "마음 심신 정"
+            },
+            {
+            "role": "user",
+            "content": "위로"
+            },
+            {
+            "role": "assistant",
+            "content": "위안 사과 안락"
+            },
             {
                 "role":"user",
-                "content": text+"의 유의어 3개를 3줄로 간단히 알려줘"
+                "content": text
             }
         ],
         temperature=0,
@@ -77,6 +102,7 @@ def gpt_response_sim_word(text):
         presence_penalty=0
     )
     return response['choices'][0]['message']['content']
+
 
 
 def gpt_response(text):
@@ -253,6 +279,42 @@ def api_ocr():
             
     return {"result": answer}
 
+def find_simi_words(text):
+    if request.method != "POST":
+        return jsonify({"result" : "fail"})
+    verb_list = okt.morphs(text, stem=True)
+    verb_list_t = []
+    for i in range(len(verb_list)):
+        if verb_list[i][-1] == '다':
+            verb_list_t.append(verb_list[i])
+    noun_list = okt.nouns(text)
+    answer = []
+    for v in noun_list+verb_list_t:
+        datas = {"params": {"dicType": "syn","pageNum": 0,"pageSize": 10,"searchWord": v,"wordGrade": 99, "userid":1}}
+        json_data = json.dumps(datas)
+        mean = requests.post('https://www.natmal.com/api/dic/Syn/search/searchWordItems', data=json_data, headers={'Content-Type': 'application/json', 'charset': 'UTF-8'})
+        try:
+            print(())
+            print()
+            print()
+            word_level = (mean.json())['results']['wordInfoItems'][0]['WORD_LEVEL']
+            part_speech = (mean.json())['results']['wordInfoItems'][0]['PART_SPEECH']
+            print(word_level)
+            print(part_speech)
+            print()
+            print()
+            sim_word = gpt_response_sim_word(v)
+            print(type(sim_word))
+            print(sim_word)
+            print([sim_word[sim_word.find('['):-1].split(', ')])
+            answer.append({"origin_word":v,"synonym":[sim_word[sim_word.find('['):-1].split(', ')], "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "word_level":word_level, "part_speech":part_speech})
+            print({"origin_word":v,"synonym":[gpt_response_sim_word(v).split(', ')], "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "word_level":word_level, "part_speech":part_speech})
+            print()
+            print()
+        except:
+            pass
+    return answer
+
 @app.route('/api/gpt', methods=['POST'])
 def api_gpt():
     if request.method != "POST":
@@ -260,26 +322,13 @@ def api_gpt():
 
     data = request.get_json()
 
-    if not data or "text" not in data:
-        return jsonify({"error": "Missing text data"}), 400
-
     text = data["text"]
     response = gpt_response(text)
-    
+    # requests.post("", find_simi_words(text))
+    find_simi_words(text)
     return jsonify({"result": response})
 
-@app.route('/api/word', methods=['POST'])
-def home():
-    if request.method != "POST":
-        return jsonify({"result" : "fail"})
-    data = request.get_json()
-    value = gpt_response_sim_word(data['text'])
-    # sql = f"""INSERT INTO test_table(word, simi_words)
-    #      VALUES('{data['text']}', '{value}');"""
-    # SQL query 실행
-    # cursor.execute(sql)
-    # db.commit()
-    return jsonify({"word":data['text'] , "simi_words" : [value]})
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port='5000', debug=True)
