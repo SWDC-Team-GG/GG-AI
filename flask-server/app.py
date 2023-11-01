@@ -5,7 +5,42 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import base64
 import openai
-openai.api_key = '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'
+import os
+import json
+# import pymysql
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+secret_file = os.path.join(BASE_DIR, 'secret.json')
+with open(secret_file) as f:
+    secrets = json.loads(f.read())
+
+def get_secret(setting, secrets=secrets):
+    try:
+        return secrets[setting]
+    except KeyError:
+        error_msg = "Set the {} environment variable".format(setting)
+        return (error_msg)
+
+openai.api_key = get_secret('Naver_id')
+
+# db = pymysql.connect(host='svc.sel3.cloudtype.app',
+#                      port=30616,
+#                      user='root',
+#                      passwd='mysql',
+#                      db='swdc',
+#                      charset='utf8')
+
+# try:
+#     with db.cursor() as cursor:
+#         sql = """
+#                 CREATE TABLE (
+#                    word  VARCHAR(256) NOT NULL PRIMARY KEY,
+#                    simi_words VARCHAR(256) NOT NULL,
+#                 );
+#               """
+#         cursor.execute(sql)
+#         db.commit()
+# finally:
+#     pass
 
 app = Flask(__name__)
 CORS(app, resources={r"*": {"origins": "*"}})
@@ -24,10 +59,7 @@ def process_ocr(base64_image):
     )
     return result
 
-@app.routes('/')
-def home():
-    value = gpt_response_sim_word('사랑')
-    return str(value)
+
 
 def gpt_response_sim_word(text):
     response = openai.ChatCompletion.create(
@@ -235,7 +267,19 @@ def api_gpt():
     response = gpt_response(text)
     
     return jsonify({"result": response})
-    
+
+@app.route('/api/word', methods=['POST'])
+def home():
+    if request.method != "POST":
+        return jsonify({"result" : "fail"})
+    data = request.get_json()
+    value = gpt_response_sim_word(data['text'])
+    # sql = f"""INSERT INTO test_table(word, simi_words)
+    #      VALUES('{data['text']}', '{value}');"""
+    # SQL query 실행
+    # cursor.execute(sql)
+    # db.commit()
+    return jsonify({"word":data['text'] , "simi_words" : [value]})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port='5000', debug=True)
