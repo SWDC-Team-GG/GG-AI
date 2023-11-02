@@ -1,307 +1,144 @@
-import io
-from PIL import Image
-from pyclovaocr import ClovaOCR
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request
+from konlpy.tag import Okt
 import requests
-import base64
+from flask_cors import CORS
 import openai
 import os
-import json
-from konlpy.tag import Okt
-import json
-import os
-print(os.environ)
-okt = Okt()
-openai.api_key = os.environ['KEY']
+
+openai.api_key = os.getenv('OPENAI_API_KEY')
 app = Flask(__name__)
 CORS(app, resources={r"*": {"origins": "*"}})
-ocr = ClovaOCR()
+okt = Okt()
 
-def process_ocr(base64_image):
-    image_bytes = base64.b64decode(base64_image)
-    image = Image.open(io.BytesIO(image_bytes))
-    
-    image.save('temp_image.png')
-    
-    result = ocr.run_ocr(
-    image_path='temp_image.png',
-    language_code='ko',
-    ocr_mode='general'
-    )
-    return result
-
-
-
-def gpt_response_sim_word(text):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages= 
-        [
-            
+def findWords(word):
+    res = requests.post(os.getenv('BASE_URL') + "/searchWordItems", json={
+        "params": {
+            "dicType": "syn",
+            "pageNum": 0,
+            "pageSize": 10,
+            "searchWord": word,
+            "wordGrade": 99
+        }})
+    res = res.json()
+    res = res["results"]["wordInfoItems"]
+    res = [
             {
-                "role": "system",
-                "content": "너는 출력할 때 이 출력형식을 따라야해 다른 문자는 절대 보낼 수 없어 '유의어'  내가 말한 단어의 유의어 1가지를 알려줘"
-            },
-            {
-            "role": "user",
-            "content": "사랑"
-            },
-            {
-            "role": "assistant",
-            "content": "마음"
-            },
-            {
-            "role": "user",
-            "content": "위로"
-            },
-            {
-            "role": "assistant",
-            "content": "위안"
-            },
-            {
-            "role": "user",
-            "content": "위로"
-            },
-            {
-            "role": "assistant",
-            "content": "위안"
-            },
-            {
-                "role":"user",
-                "content": text
+                "wordId": wordInfoItem["WORD_NO"],
+                "name": wordInfoItem["WORD_NAME"],
+                "meaning": wordInfoItem["DEFINITION"],
+                "part": wordInfoItem["PART_SPEECH"]
             }
-        ],
-        temperature=0,
-        max_tokens=1024,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0
-    )
-    return response['choices'][0]['message']['content']
+           for wordInfoItem in res if word == wordInfoItem["WORD_NAME"]
+           ]
+    return res
 
+def findSimilarWords(wordInfo):
+    res = requests.post(os.getenv('BASE_URL') + "/selectedWordItem", json={
+        "params": {
+            "itemId": wordInfo['wordId'],
+            "itemLevel": 4,
+            "showType": 1,
+            "userId": 1,
+            "viewDepth": 1,
+            "viewType": "List"
+        }})
+    res = res.json()
+    res = res["synFirstItems"]
+    res = [
+        {
+            "name": wordInfoItem["WORD_NAME"],
+            "level": int(wordInfoItem["WORD_LEVEL"])
+        }
+        for wordInfoItem in res
+    ]
+    return res
 
-
-def gpt_response(text):
-    response = openai.ChatCompletion.create(
+def findCorrectWord(text, wordInfos):
+    res = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
             {
             "role": "system",
-            "content": "어려운 단어를 쉬운 단어로 바꿔 줘."
+            "content": "원래의 문장과 그 문장에서 사용된 단어를 제공받고, 그 단어의 모든 사전적 의미 중 그 문장에서 사용된 의미를 선택해야 한다. 다음과 같은 출력형식을 가져야 한다: index"
             },
             {
             "role": "user",
-            "content": "심심한 사과의 말씀 드립니다."
+            "content": "나는 이 입장을 고수하겠다., 고수하다, [차지한 물건이나 형세 따위를 굳게 지키다., 근심과 걱정으로 괴로워하다., 머리를 조아리어 존경의 뜻을 나타내다.]"
             },
             {
             "role": "assistant",
-            "content": "깊은 사과의 말씀 드립니다."
+            "content": "0"
             },
             {
             "role": "user",
-            "content": "심심한 위로의 말씀 드립니다."
+            "content": f"{text}, {wordInfos[0]['name']}, {[wordInfo['meaning'] for wordInfo in wordInfos]}"
             },
-            {
-            "role": "assistant",
-            "content": "따뜻한 위로의 말씀 드립니다."
-            },
-            {
-            "role": "user",
-            "content": "금일까지 프로젝트를 끝내 주시겠어요?"
-            },
-            {
-            "role": "assistant",
-            "content": "오늘까지 프로젝트를 끝내 주시겠어요?"
-            },
-            {
-            "role": "user",
-            "content": "사흘 뒤에 축제가 있다."
-            },
-            {
-            "role": "assistant",
-            "content": "3일 뒤에 축제가 있다."
-            },
-            {
-            "role": "user",
-            "content": "나흘 전에 전투가 있었다."
-            },
-            {
-            "role": "assistant",
-            "content": "4일 전에 전투가 있었다."
-            },
-            {
-            "role": "user",
-            "content": "이레 뒤는 내 생일이다."
-            },
-            {
-            "role": "assistant",
-            "content": "7일 뒤는 내 생일이다."
-            },
-            {
-            "role": "user",
-            "content": "열흘 뒤는 우리 가족이 제사를 하는 날이다."
-            },
-            {
-            "role": "assistant",
-            "content": "10일 뒤는 우리 가족이 제사를 하는 날이다."
-            },
-            {
-            "role": "user",
-            "content": "여드레 뒤는 규민이의 생일이다."
-            },
-            {
-            "role": "assistant",
-            "content": "8일 뒤는 규민이의 생일이다."
-            },
-            {
-            "role": "user",
-            "content": "아흐레 뒤는 쇼핑을 하는 날이다."
-            },
-            {
-            "role": "assistant",
-            "content": "9일 뒤는 쇼핑을 하는 날이다."
-            },
-            {
-            "role": "user",
-            "content": "엿새 뒤는 몇월 몇일일까?"
-            },
-            {
-            "role": "assistant",
-            "content": "6일 뒤는 몇월 몇일일까?"
-            },
-            {
-            "role": "user",
-            "content": "닷새 전은 무슨 요일일까?"
-            },
-            {
-            "role": "assistant",
-            "content": "5일 전은 무슨 요일일까?"
-            },
-            {
-            "role": "user",
-            "content": "너 정말 이지적이구나"
-            },
-            {
-            "role": "assistant",
-            "content": "너 정말 똑똑하구나"
-            },
-            {
-            "role": "user",
-            "content": "항상 무운을 빌게"
-            },
-            {
-            "role": "assistant",
-            "content": "항상 행운을 빌게"
-            },
-            {
-            "role": "user",
-            "content": "너 고지식하다"
-            },
-            {
-            "role": "assistant",
-            "content": "너 융통성이 없다"
-            },
-            {
-            "role": "user",
-            "content": "고지식한 사람"
-            },
-            {
-            "role": "assistant",
-            "content": "융통성 없는 사람"
-            },
-            {
-            "role": "user",
-            "content": "무안하다"
-            },
-            {
-            "role": "assistant",
-            "content": "뻘쭘하다"
-            },
-            {
-            "role":"user",
-            "content": text
-            }
         ],
         temperature=0,
         max_tokens=1024,
-        top_p=1,
+        top_p=0,
         frequency_penalty=0,
         presence_penalty=0
-        )
-    return response['choices'][0]['message']['content']
+    )
+    return res['choices'][0]['message']['content']
+        
 
-@app.route('/api/ocr', methods=['POST'])
-def api_ocr():
-    if request.method != "POST":
-        return jsonify({"result" : "fail"})
 
-    data = request.get_json()
+@app.route('/translate', methods=['POST'])
+def translate():
+    text = request.get_json()['text']
+    res = okt.pos(text, stem=True)
+    
+    #불용어 처리
+    res = [word for word in res 
+           if word[1] != 'Josa' and len(word[0]) > 1]
+    
+    #명사 + 하다 => 동사 결합
+    for i in range(len(res)):
+        if (res[i-1][1] == "Noun" and res[i][0] == "하다"):
+            res[i-1] = [res[i-1][0]+"하다", "Verb"]
+            res[i] = ""
+    res = [word for word in res if word]
+    
+    #단어 처리
+    wordInfos = []
+    for item in res:
+        words = findWords(item[0])
+        if words:
+            wordInfos.append(words[int(findCorrectWord(text, words))])
+    
+    if len(words) == 0:
+        return {"plainText": text, "translateText": text}
+    
+    #유의어 검색
+    similarWord = []
+    for wordInfo in wordInfos:
+        similarWords = findSimilarWords(wordInfo)
+        similarWord.append(min(similarWords, key=lambda x: x['level']))
 
-    if not data or "image" not in data:
-        return jsonify({"error": "Missing image data"}), 400
-
-    base64_image = data["image"]
-    result = process_ocr(base64_image)
-
-    cnt = 0
-    answer = ""
-    while True:
-        try:
-            answer += result['words'][cnt]['text'] + " "
-            print(result['words'][cnt]['text'], end=" ") 
-            cnt += 1
-        except:
-            break
-            
-    return {"result": answer}
-
-def find_simi_words(text):
-    if request.method != "POST":
-        return jsonify({"result" : "fail"})
-    verb_list = okt.morphs(text, stem=True)
-    verb_list_t = []
-    for i in range(len(verb_list)):
-        if verb_list[i][-1] == '다':
-            verb_list_t.append(verb_list[i])
-    noun_list = okt.nouns(text)
-    answer = []
-    for v in noun_list+verb_list_t:
-        datas = {"params": {"dicType": "syn","pageNum": 0,"pageSize": 10,"searchWord": v,"wordGrade": 99, "userid":1}}
-        json_data = json.dumps(datas)
-        mean = requests.post('https://www.natmal.com/api/dic/Syn/search/searchWordItems', data=json_data, headers={'Content-Type': 'application/json', 'charset': 'UTF-8'})
-        try:
-            print()
-            print()
-            print()
-            word_level = (mean.json())['results']['wordInfoItems'][0]['WORD_LEVEL']
-            part_speech = (mean.json())['results']['wordInfoItems'][0]['PART_SPEECH']
-            print(word_level)
-            print(part_speech)
-            print()
-            print()
-            sim_word = gpt_response_sim_word(v)
-            print(sim_word)
-            answer.append({"origin_word":v,"synonym":sim_word, "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "word_level":word_level, "part_speech":part_speech})
-            print({"origin_word":v,"synonym":[gpt_response_sim_word(v)], "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "part_speech":part_speech})
-            print()
-            print()
-        except:
-            pass
-    return answer
-
-@app.route('/api/gpt', methods=['POST'])
-def api_gpt():
-    if request.method != "POST":
-        return jsonify({"result" : "fail"})
-
-    data = request.get_json()
-
-    text = data["text"]
-    response = gpt_response(text)
-    # requests.post("", find_simi_words(text))
-    f = find_simi_words(text)
-    return jsonify(f)
+    #단어와 유의어 묶기
+    translateWords = []
+    for index, wordInfo in enumerate(wordInfos):
+        translateWords.append(
+                                {
+                                    "plainWord": wordInfo['name'], 
+                                    "translateWord": similarWord[index]['name'],
+                                    "translateWordLevel": similarWord[index]['level'],
+                                    "meaning": wordInfo['meaning'],
+                                    "part": wordInfo['part']
+                                }
+                            )
+    
+    translateText = text
+    for translateWord in translateWords:
+        if translateWord['part'] == "동사":
+            translateText = translateText.replace(translateWord['plainWord'][:-1], translateWord['translateWord'][:-1])
+        else:
+            translateText = translateText.replace(translateWord['plainWord'], translateWord['translateWord'])
+        
+    
+    return {"translateText": translateText, "translateWords": translateWords}
+    
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port='5000', debug=False)
+    app.run()
