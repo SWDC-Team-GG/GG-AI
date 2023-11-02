@@ -84,9 +84,9 @@ def findCorrectWord(text, wordInfos):
         
 
 
-@app.route('/translate', methods=['POST'])
+@app.route('/translate', methods=['GET'])
 def translate():
-    text = request.get_json()['text']
+    text = request.args.get('text')
     res = okt.pos(text, stem=True)
     
     #불용어 처리
