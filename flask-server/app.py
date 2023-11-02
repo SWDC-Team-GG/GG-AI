@@ -13,39 +13,7 @@ import json
 import os
 print(os.environ)
 okt = Okt()
-# import pymysql
-# with open('./secret.json') as f:
-#     secrets = json.loads(f.read())
-
-# def get_secret(setting, secrets=secrets):
-#     try:
-#         return secrets[setting]
-#     except KeyError:
-#         error_msg = "Set the {} environment variable".format(setting)
-#         return (error_msg)
-
 openai.api_key = os.environ['KEY']
-
-# db = pymysql.connect(host='svc.sel3.cloudtype.app',
-#                      port=30616,
-#                      user='root',
-#                      passwd='mysql',
-#                      db='swdc',
-#                      charset='utf8')
-
-# try:
-#     with db.cursor() as cursor:
-#         sql = """
-#                 CREATE TABLE (
-#                    word  VARCHAR(256) NOT NULL PRIMARY KEY,
-#                    simi_words VARCHAR(256) NOT NULL,
-#                 );
-#               """
-#         cursor.execute(sql)
-#         db.commit()
-# finally:
-#     pass
-
 app = Flask(__name__)
 CORS(app, resources={r"*": {"origins": "*"}})
 ocr = ClovaOCR()
