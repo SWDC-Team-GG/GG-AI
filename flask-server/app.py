@@ -11,6 +11,7 @@ import json
 from konlpy.tag import Okt
 import json
 import os
+print(os.environ)
 okt = Okt()
 # import pymysql
 # with open('./secret.json') as f:
@@ -23,7 +24,7 @@ okt = Okt()
 #         error_msg = "Set the {} environment variable".format(setting)
 #         return (error_msg)
 
-openai.api_key = "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"
+openai.api_key = os.environ['KEY']
 
 # db = pymysql.connect(host='svc.sel3.cloudtype.app',
 #                      port=30616,
@@ -72,7 +73,7 @@ def gpt_response_sim_word(text):
             
             {
                 "role": "system",
-                "content": "너는 출력할 때 이 출력형식을 따라야해 다른 문자는 절대 보낼 수 없어 '유의어1 유의어2 유의어3' 내가 말한 단어의 유의어 3가지를 띄어쓰기로 구분해서 알려줘"
+                "content": "너는 출력할 때 이 출력형식을 따라야해 다른 문자는 절대 보낼 수 없어 '유의어'  내가 말한 단어의 유의어 1가지를 알려줘"
             },
             {
             "role": "user",
@@ -80,7 +81,7 @@ def gpt_response_sim_word(text):
             },
             {
             "role": "assistant",
-            "content": "마음 심신 정"
+            "content": "마음"
             },
             {
             "role": "user",
@@ -88,7 +89,15 @@ def gpt_response_sim_word(text):
             },
             {
             "role": "assistant",
-            "content": "위안 사과 안락"
+            "content": "위안"
+            },
+            {
+            "role": "user",
+            "content": "위로"
+            },
+            {
+            "role": "assistant",
+            "content": "위안"
             },
             {
                 "role":"user",
@@ -294,7 +303,7 @@ def find_simi_words(text):
         json_data = json.dumps(datas)
         mean = requests.post('https://www.natmal.com/api/dic/Syn/search/searchWordItems', data=json_data, headers={'Content-Type': 'application/json', 'charset': 'UTF-8'})
         try:
-            print(())
+            print()
             print()
             print()
             word_level = (mean.json())['results']['wordInfoItems'][0]['WORD_LEVEL']
@@ -304,11 +313,9 @@ def find_simi_words(text):
             print()
             print()
             sim_word = gpt_response_sim_word(v)
-            print(type(sim_word))
             print(sim_word)
-            print([sim_word[sim_word.find('['):-1].split(', ')])
-            answer.append({"origin_word":v,"synonym":[sim_word[sim_word.find('['):-1].split(', ')], "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "word_level":word_level, "part_speech":part_speech})
-            print({"origin_word":v,"synonym":[gpt_response_sim_word(v).split(', ')], "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "word_level":word_level, "part_speech":part_speech})
+            answer.append({"origin_word":v,"synonym":sim_word, "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "word_level":word_level, "part_speech":part_speech})
+            print({"origin_word":v,"synonym":[gpt_response_sim_word(v)], "mean":(mean.json())["results"]["wordInfoItems"][0]["DEFINITION"], "part_speech":part_speech})
             print()
             print()
         except:
@@ -325,10 +332,8 @@ def api_gpt():
     text = data["text"]
     response = gpt_response(text)
     # requests.post("", find_simi_words(text))
-    find_simi_words(text)
-    return jsonify({"result": response})
-
-
+    f = find_simi_words(text)
+    return jsonify(f)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port='5000', debug=True)
