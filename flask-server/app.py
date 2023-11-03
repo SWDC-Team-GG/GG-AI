@@ -36,7 +36,7 @@ def findSimilarWords(wordInfo):
     res = requests.post(os.getenv('BASE_URL') + "/selectedWordItem", json={
         "params": {
             "itemId": wordInfo['wordId'],
-            "itemLevel": 4,
+            "itemLevel": 99,
             "showType": 1,
             "userId": 1,
             "viewDepth": 1,
@@ -98,7 +98,9 @@ def translate():
            if word[1] != 'Josa' and len(word[0]) > 1]
     
     #명사 + 하다 => 동사 결합
-    for i in range(len(res)):
+    res_copy = res[:]
+    for i in range(1, len(res_copy)):
+        print(res[i-1][0], res[i-1][1])
         if (res[i-1][1] == "Noun" and res[i][0] == "하다"):
             res[i-1] = [res[i-1][0]+"하다", "Verb"]
             res[i] = ""
@@ -118,6 +120,9 @@ def translate():
     similarWord = []
     for wordInfo in wordInfos:
         similarWords = findSimilarWords(wordInfo)
+        if len(similarWords) == 0:
+            del wordInfos[wordInfos.index(wordInfo)]
+            continue
         similarWord.append(findNearNum(similarWords, float(field)*float(education)/10))
 
     #단어와 유의어 묶기
