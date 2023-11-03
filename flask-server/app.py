@@ -81,12 +81,16 @@ def findCorrectWord(text, wordInfos):
         presence_penalty=0
     )
     return res['choices'][0]['message']['content']
-        
 
+def findNearNum(exList, values):
+    res = min(exList, key=lambda x:abs(x['level']-values))
+    return res
 
 @app.route('/translate', methods=['GET'])
 def translate():
     text = request.args.get('text')
+    education = request.args.get('education')
+    field = request.args.get('field')
     res = okt.pos(text, stem=True)
     
     #불용어 처리
@@ -108,13 +112,13 @@ def translate():
             wordInfos.append(words[int(findCorrectWord(text, words))])
     
     if len(words) == 0:
-        return {"plainText": text, "translateText": text}
+        return { "translateText": text, "translateWords": None }
     
     #유의어 검색
     similarWord = []
     for wordInfo in wordInfos:
         similarWords = findSimilarWords(wordInfo)
-        similarWord.append(min(similarWords, key=lambda x: x['level']))
+        similarWord.append(findNearNum(similarWords, float(field)*float(education)/10))
 
     #단어와 유의어 묶기
     translateWords = []
