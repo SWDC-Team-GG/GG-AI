@@ -125,7 +125,7 @@ def translate():
             continue
         similarWord.append(findNearNum(similarWords, float(field)*float(education)/10))
 
-    #단어와 유의어 묶기
+    #단어와 유의어 묶기 
     translateWords = []
     for index, wordInfo in enumerate(wordInfos):
         translateWords.append(
